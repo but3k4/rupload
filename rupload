@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+#
+import os
+import ftplib
+
+from optparse import OptionParser
+from ConfigParser import ConfigParser
+from subprocess import Popen, PIPE
+
+def main():
+    usage = "%prog [options] args"
+    parser = OptionParser(usage)
+    parser.add_option("-t", "--to", dest="repo", help="Repository name")
+    parser.add_option("-f", "--spec", dest="spec_file", help="Spec file")
+    (options, args) = parser.parse_args()
+    try:
+        if not options.repo or not options.spec_file:
+            parser.print_help()
+            return -1
+    except Exception, e:
+        raise("Error: %s" % repr(e))
+
+    upload_files(options.repo, options.spec_file)
+
+def spec_parser(spec_file):
+    files = Popen([ 'rpm', '-q', '--qf', '%{NAME}-%{VERSION}-%{RELEASE}\n', 
+        '--specfile', spec_file ], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    return files.stdout.readlines()
+
+def get_files(spec_file):
+    p = Popen([ 'rpm', '--eval', '%{_topdir}' ], stdout=PIPE, stderr=PIPE)
+    path = p.stdout.readline().strip()
+
+    rpm_files = [ os.path.join(path, os.path.join(_dir, _file.strip()))
+        for _dir in [ 'RPMS/x86_64', 'RPMS/noarch', 'SRPMS' ] 
+        for _file in os.listdir(os.path.join(path, _dir)) if
+        os.path.isdir(os.path.join(path, _dir)) ]
+
+    pkg_names = [ f.strip() for f in spec_parser(spec_file) ]
+
+    files = [ file for file in rpm_files if 
+        ".".join(os.path.basename(file)[::-1].split('.')[2:])[::-1]
+        in pkg_names ]
+
+    return files
+
+def config_parser(session, file='/etc/rupload.conf'):
+    config = ConfigParser()
+    try:
+        config.read(file)
+        infos = {'fqdn': config.get(session, 'fqdn')}
+        infos.update({'login': config.get(session, 'login') })
+        infos.update({'password': config.get(session, 'password')})
+        infos.update({'incoming': config.get(session, 'incoming')})
+        infos.update({'passive': config.getboolean(session, 'passive')})
+        return infos
+    except Exception, ConfigParser.Error:
+        raise("Error: %s" % repr(ConfigParser.Error))
+ 
+def upload_files(repo, file):
+    infos = config_parser(repo)
+    try:
+        ftp = ftplib.FTP(infos['fqdn'], infos['login'], infos['password'])
+        ftp.cwd(infos['incoming'])
+        if infos['passive']:
+            ftp.set_pasv(1)
+    except ftplib.error_reply, e:
+        raise("Error: Cannot conect to ftp server %s" % repr(e))
+
+    if get_files(file):
+        try:
+            print ("Uploading rpm files to repository %s" % repo)
+            for f in get_files(file):
+                name = os.path.basename(f.strip())
+                ftp.storbinary("STOR %s" % name, open(f.strip(), 'rb'))
+                print "Uploading %s" % name
+        except Exception, e:
+            raise("Error: %s" % repr(e))
+
+    ftp.quit()
+
+if __name__ == '__main__':
+    main()
