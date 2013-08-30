@@ -1,4 +1,6 @@
 rupload
 =======
 
-utility to upload RPM packages
+rupload is a tool that enables developers to easily upload their
+RPM packages to the repository.
+
