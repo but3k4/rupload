@@ -69,7 +69,7 @@ def upload_files(repo, spec_file):
 
     if get_files(spec_file):
         try:
-            print ("Uploading rpm files to repository %s" % repo)
+            print ("Uploading rpm files to %s repository" % repo)
             for f in get_files(spec_file):
                 name = os.path.basename(f.strip())
                 ftp.storbinary("STOR %s" % name, open(f.strip(), 'rb'))
