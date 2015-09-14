@@ -11,8 +11,9 @@ def configParser(_section, _file='/etc/rupload.conf'):
     config = ConfigParser()
     try:
         config.read(_file)
-        infos = {option: config.get(_section, option) for option in \
-            config.options(_section)}
+        infos = {}
+        for option in config.options(_section):
+            infos.update({option: config.get(_section, option)})
         return infos
     except NoSectionError, error:
         raise Exception(error)
@@ -41,7 +42,7 @@ def getFiles(_spec):
     return files
 
 def uploadFiles(_repo, _spec):
-    infos = configParser(repo)
+    infos = configParser(_repo)
     try:
         ftp = ftplib.FTP(infos['host'], infos['login'], infos['password'])
         ftp.cwd(infos['incoming'])
