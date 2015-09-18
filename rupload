@@ -29,11 +29,8 @@ def getFiles(_spec):
     except CalledProcessError, error:
         raise Exception(error)
 
-    rpms = []
-    for d in [ 'RPMS/x86_64', 'RPMS/noarch', 'SRPMS' ]:
-        if os.path.isdir(os.path.join(path, d)):
-            for f in os.listdir(os.path.join(path, d)):
-                rpms.append(os.path.join(path, d, f))
+    rpms = [ os.path.join(d[0], f) for d in os.walk(path) \
+        for f in d[2] if f.endswith('.rpm') ]
 
     files = [ pkg for pkg in rpms if
         '.'.join(os.path.basename(pkg).split('.')[:-2])
@@ -48,8 +45,11 @@ def uploadFiles(_repo, _spec):
         ftp.cwd(infos['incoming'])
         if infos['passive']:
             ftp.set_pasv(1)
-        print ("Uploading files to %s" % _repo)
+        count = False
         for f in getFiles(_spec):
+            if not count:
+                print ("Uploading files to %s" % _repo)
+                count = True
             name = os.path.basename(f.strip())
             ftp.storbinary("STOR %s" % name, open(f.strip(), 'rb'))
             print "Uploading %s" % name
